@@ -532,6 +532,17 @@ func SCTListSerializedLength(scts []SignedCertificateTimestamp) (int, error) {
 	if sctListLen > 0xFFFF+2 {
 		return 0, fmt.Errorf("SCT List too large to serialize: %d", sctListLen)
 	}
+	
+	if sctListLen < 128 {
+            sctListLen += 2
+        } else if sctListLen < 0x100 {
+            sctListLen += 3
+        } else if sctListLen < 0x10000 {
+            sctListLen += 4
+        } else {
+            sctListLen += 5
+        }
+	
 	return sctListLen, nil
 }
 
@@ -553,9 +564,30 @@ func SerializeSCTListHere(scts []SignedCertificateTimestamp, here []byte) ([]byt
 	}
 
 	here = here[0:sctListOutLen]
+	
+	here[0] = 4
+	sctListPos := 0
+	
+	if sctListOutLen < 130 {
+            here[1] = uint8(sctListOutLen - 2)
+            sctListPos += 2
+        } else if sctListOutLen < 0x103 {
+            here[1] = 0x81
+            here[2] = uint8(sctListOutLen - 3)
+            sctListPos += 3            
+        } else if sctListOutLen < 0x10004 {
+            here[1] = 0x82
+            binary.BigEndian.PutUint16(here[2:4], uint16(sctListOutLen - 4))
+            sctListPos += 4            
+        } else {
+            binary.BigEndian.PutUint32(here[1:5], uint32(sctListOutLen - 5))
+            here[1] = 0x83
+            sctListPos += 5
+        }
 
-	binary.BigEndian.PutUint16(here[0:2], uint16(sctListOutLen-2))
-	sctListPos := 2
+	binary.BigEndian.PutUint16(here[sctListPos:sctListPos+2], uint16(sctListOutLen - sctListPos - 2))
+        sctListPos += 2
+
 	for i, sct := range scts {
 		n, _ := sct.SerializedLength()
 		// Error conditions for SerializedLength checked in SCTListSerializedLength above

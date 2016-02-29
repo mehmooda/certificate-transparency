@@ -236,6 +236,8 @@ const (
 		"7369676e6174757265"
 
 	defaultSCTListHexString string =
+	// ASN1 Header
+	"0476" +
 	// Total length, 2 bytes
 	"0074" +
 		// defaultSCTLength, 2 bytes
